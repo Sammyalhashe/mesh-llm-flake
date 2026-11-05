@@ -23,8 +23,9 @@ nix build .
 
   services.mesh-llm = {
     enable = true;
-    extraArgs = [ "--auto" ];   # join the best public mesh and contribute
-    memoryMax = "24G";
+    # "client" (default) uses peers' models; "serve" also runs models here.
+    mode = "client";
+    extraArgs = [ "--auto" ];   # join the best public mesh
   };
 }
 ```
@@ -34,8 +35,9 @@ The OpenAI-compatible API listens on `localhost:9337` and the console on
 
 The service runs as a dedicated `mesh-llm` user with an empty capability set, a
 read-only filesystem apart from `/var/lib/mesh-llm` and `/var/cache/mesh-llm`,
-no access to `/home`, and only GPU device nodes. With `restrictLocalEgress`
-(the default) it also rejects new connections to loopback and private networks,
+no access to `/home`, and GPU device nodes only in serve mode. With
+`restrictLocalEgress` (the default) it also rejects new connections to loopback
+and private networks,
 apart from DNS and its own API ports, so a compromised node cannot reach other
 services on the host or LAN. Add LANs that use public addresses to
 `extraBlockedNetworks`.

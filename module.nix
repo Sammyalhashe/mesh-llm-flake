@@ -3,6 +3,7 @@ self:
 
 let
   cfg = config.services.mesh-llm;
+  serving = cfg.mode == "serve";
   settingsFormat = pkgs.formats.toml { };
 
   configFile = pkgs.runCommand "mesh-llm-config.toml"
@@ -69,11 +70,20 @@ in
       description = "The mesh-llm package to run.";
     };
 
+    mode = lib.mkOption {
+      type = lib.types.enum [ "client" "serve" ];
+      default = "client";
+      description = ''
+        `client` uses models hosted by other peers without running any locally,
+        and gets no GPU access. `serve` also runs models on this host for the mesh.
+      '';
+    };
+
     extraArgs = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ "--auto" ];
       example = [ "--model" "Qwen/Qwen2.5-3B-Instruct-GGUF@main:q4_k_m" "--publish" ];
-      description = "Arguments passed to `mesh-llm serve`. The default joins the best public mesh.";
+      description = "Arguments passed to `mesh-llm <mode>`. The default joins the best public mesh.";
     };
 
     settings = lib.mkOption {
@@ -106,7 +116,7 @@ in
     bindPort = lib.mkOption {
       type = lib.types.nullOr lib.types.port;
       default = null;
-      description = "Fixed UDP port for mesh QUIC traffic, so it can be opened for direct peer paths.";
+      description = "Fixed UDP port for mesh QUIC traffic in serve mode, so it can be opened for direct peer paths.";
     };
 
     openFirewall = lib.mkOption {
@@ -155,7 +165,7 @@ in
     users.users.mesh-llm = {
       isSystemUser = true;
       group = "mesh-llm";
-      extraGroups = [ "video" "render" ];
+      extraGroups = lib.optionals serving [ "video" "render" ];
       home = "/var/lib/mesh-llm";
     };
     users.groups.mesh-llm = { };
@@ -169,7 +179,7 @@ in
       after = [ "network-online.target" ];
 
       # mesh-llm reads NVIDIA VRAM from nvidia-smi.
-      path = lib.optional (lib.elem "nvidia" config.services.xserver.videoDrivers) config.hardware.nvidia.package.bin;
+      path = lib.optional (serving && lib.elem "nvidia" config.services.xserver.videoDrivers) config.hardware.nvidia.package.bin;
 
       environment = {
         HOME = "/var/lib/mesh-llm";
@@ -185,12 +195,12 @@ in
           (lib.getExe cfg.package)
           "--log-format"
           "json"
-          "serve"
+          cfg.mode
           "--port"
           (toString cfg.apiPort)
           "--console"
           (toString cfg.consolePort)
-        ] ++ lib.optionals (cfg.bindPort != null) [ "--bind-port" (toString cfg.bindPort) ]
+        ] ++ lib.optionals (serving && cfg.bindPort != null) [ "--bind-port" (toString cfg.bindPort) ]
         ++ cfg.extraArgs);
         ExecStopPost = lib.optional cfg.restrictLocalEgress "+${removeEgressBlock}";
         Restart = "on-failure";
@@ -205,7 +215,7 @@ in
         MemoryMax = lib.mkIf (cfg.memoryMax != null) cfg.memoryMax;
 
         DevicePolicy = "closed";
-        DeviceAllow = [
+        DeviceAllow = lib.optionals serving [
           "char-drm rw"
           "char-kfd rw"
           "char-nvidia rw"
