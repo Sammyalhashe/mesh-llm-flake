@@ -140,6 +140,9 @@ in
       wants = [ "network-online.target" ];
       after = [ "network-online.target" ];
 
+      # mesh-llm reads NVIDIA VRAM from nvidia-smi.
+      path = lib.optional (lib.elem "nvidia" config.services.xserver.videoDrivers) config.hardware.nvidia.package.bin;
+
       environment = {
         HOME = "/var/lib/mesh-llm";
         XDG_CACHE_HOME = "/var/cache/mesh-llm";
