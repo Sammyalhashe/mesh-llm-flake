@@ -179,7 +179,9 @@ in
         DeviceAllow = [
           "char-drm rw"
           "char-kfd rw"
-          "char-nvidia-frontend rw"
+          "char-nvidia rw"
+          "char-nvidiactl rw"
+          "char-nvidia-modeset rw"
           "char-nvidia-uvm rw"
           "char-nvidia-caps rw"
         ];
