@@ -47,6 +47,8 @@ stdenv.mkDerivation {
     runHook postInstall
   '';
 
+  passthru.runtimeId = "meshllm-native-runtime-linux-x86_64-vulkan";
+
   meta = {
     description = "Pool GPUs over the internet for LLM inference (Vulkan build)";
     homepage = "https://github.com/Mesh-LLM/mesh-llm";

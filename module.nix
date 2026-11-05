@@ -3,6 +3,15 @@ self:
 
 let
   cfg = config.services.mesh-llm;
+  settingsFormat = pkgs.formats.toml { };
+
+  configFile = pkgs.runCommand "mesh-llm-config.toml"
+    {
+      src = settingsFormat.generate "mesh-llm-config.toml" cfg.settings;
+    } ''
+    cp "$src" "$out"
+    HOME="$TMPDIR" DO_NOT_TRACK=1 ${lib.getExe cfg.package} config validate --config-path "$out"
+  '';
 
   privateNetworks = [
     "127.0.0.0/8"
@@ -67,6 +76,21 @@ in
       description = "Arguments passed to `mesh-llm serve`. The default joins the best public mesh.";
     };
 
+    settings = lib.mkOption {
+      inherit (settingsFormat) type;
+      default = { };
+      example = lib.literalExpression ''
+        {
+          request_defaults.chat_template_file = ./template.jinja;
+          model_fit.ctx_size = 131072;
+        }
+      '';
+      description = ''
+        mesh-llm config.toml, validated at build time. See
+        <https://meshllm.cloud/docs/pages/config-reference/>.
+      '';
+    };
+
     apiPort = lib.mkOption {
       type = lib.types.port;
       default = 9337;
@@ -124,6 +148,10 @@ in
       message = "services.mesh-llm.openFirewall requires services.mesh-llm.bindPort.";
     }];
 
+    # Without a pin mesh-llm prefers a downloaded CUDA runtime whenever
+    # nvidia-smi works, and that runtime cannot load outside an FHS system.
+    services.mesh-llm.settings.runtime.native_runtime.selection = lib.mkDefault cfg.package.runtimeId;
+
     users.users.mesh-llm = {
       isSystemUser = true;
       group = "mesh-llm";
@@ -146,6 +174,7 @@ in
       environment = {
         HOME = "/var/lib/mesh-llm";
         XDG_CACHE_HOME = "/var/cache/mesh-llm";
+        MESH_LLM_CONFIG = "${configFile}";
       } // lib.optionalAttrs (!cfg.analytics) {
         DO_NOT_TRACK = "1";
       };
